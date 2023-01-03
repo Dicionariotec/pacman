@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Page Title</title>
+<script src="node_modules/pixi.js/dist/pixi.js"></script>
+</head>
+<body>
+<script>
+    const spriteWidth = 46;
+    const spriteHeight = 46;
+
+    // 828 / 46 = 18
+    // 644 / 46 = 15
+    const stage = [
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+    ];
+
+    const gameWidth = stage[0].length * spriteWidth;
+    const gameHeight = stage.length * spriteHeight;
+
+    const speed = 3;
+    const app = new PIXI.Application({ background: '#1099bb', width: gameWidth, height: gameHeight });
+    const graphics = new PIXI.Graphics();
+    const direction = {
+        "stand": 0,
+        "left": 1,
+        "up": 2,
+        "right": 3,
+        "down": 4,
+    };
+    var currentDirection = {
+        horizontal: direction.stand,
+        vertical: direction.stand,
+    };
+    
+
+    for (let row = 0; row < stage.length; row++) {
+        for (let column = 0; column < stage[row].length; column++) {
+
+            if (stage[row][column] == 0) {
+                continue;
+            }
+
+            graphics.beginFill(0xDE3249);
+            graphics.drawRect(column * spriteWidth, row * spriteHeight, spriteWidth, spriteHeight);
+            graphics.endFill();
+        }
+    }
+    app.stage.addChild(graphics);
+
+    // 640 x 184 = 14 x 4
+    // 640 / 14 = 46
+    // 184 / 4 = 46
+    const baseTexture = PIXI.Texture.from('resources/characters.png');
+    const pacmanTextures = [];
+
+    pacmanTextures['right'] = [];
+    pacmanTextures['right'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 10, 0, spriteWidth, 46)));
+    pacmanTextures['right'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 11, 0, spriteWidth, 46)));
+
+    pacmanTextures['left'] = [];
+    pacmanTextures['left'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 10, spriteHeight * 2, spriteWidth, 46)));
+    pacmanTextures['left'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 11, spriteHeight * 2, spriteWidth, 46)));
+
+    pacmanTextures['up'] = [];
+    pacmanTextures['up'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 10, spriteHeight * 3, spriteWidth, 46)));
+    pacmanTextures['up'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 11, spriteHeight * 3, spriteWidth, 46)));
+
+    pacmanTextures['down'] = [];
+    pacmanTextures['down'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 10, spriteHeight * 1, spriteWidth, 46)));
+    pacmanTextures['down'].push(new PIXI.Texture(baseTexture, new PIXI.Rectangle(spriteWidth * 11, spriteHeight * 1, spriteWidth, 46)));
+    
+    
+    class CustomAnimatedSprite extends PIXI.AnimatedSprite
+    {
+        constructor(textures, autoUpdate = true) {
+            super(textures);
+        }
+
+        set textures(value) {
+            if (value[0] instanceof PIXI.Texture) {
+              this._textures = value;
+              this._durations = null;
+            } else {
+              this._textures = [];
+              this._durations = [];
+              for (let i = 0; i < value.length; i++) {
+                this._textures.push(value[i].texture);
+                this._durations.push(value[i].time);
+              }
+            }
+            this._previousFrame = null;
+            this.updateTexture();
+        }
+    }
+
+    PIXI.CustomAnimatedSprite = CustomAnimatedSprite;
+
+    var pacman = new PIXI.CustomAnimatedSprite(pacmanTextures['right']);
+
+    pacman.animationSpeed = 0.1;
+    pacman.x = (gameWidth - spriteWidth) / 2;
+    pacman.y = (gameHeight - spriteHeight) / 2;
+
+    app.stage.addChild(pacman);
+
+    document.body.appendChild(app.view);
+
+    app.ticker.add(delta => gameLoop());
+    function gameLoop() {
+        if (currentDirection.horizontal == direction.stand && currentDirection.vertical == direction.stand) {
+            return;
+        }
+
+        let currentVerticalPos = (pacman.y + (spriteHeight / 2)) / spriteHeight;
+        let currentHorizontalPos = (pacman.x + (spriteHeight / 2)) / spriteWidth;
+        let roundedCurrentVerticalPos = Math.abs(Math.trunc(currentVerticalPos));
+        let roundedCurrentHorizontalPos = Math.abs(Math.trunc(currentHorizontalPos));
+        
+        pacman.play();
+        
+        if (currentDirection.horizontal == direction.right) {
+            let nextMov = currentHorizontalPos + ((spriteWidth / 2) / spriteWidth);
+            let nextMovUp = currentVerticalPos + ((spriteHeight / 3) / spriteHeight);
+            let nextMovDown = currentVerticalPos - ((spriteHeight / 3) / spriteHeight);
+            let roundedNextMove = Math.abs(Math.trunc(nextMov));
+            let roundedNextMoveUp = Math.abs(Math.trunc(nextMovUp));
+            let roundedNextMoveDown = Math.abs(Math.trunc(nextMovDown));
+            
+            let isRightBoundLimit = roundedCurrentHorizontalPos >= stage[roundedCurrentVerticalPos].length - 1;
+            let checkNextMovFromCenter = stage[roundedCurrentVerticalPos][roundedNextMove] == 1;
+            let checkNextMovFromCenterUp = stage[roundedNextMoveUp][roundedNextMove] == 1;
+            let checkNextMovFromCenterDown = stage[roundedNextMoveDown][roundedNextMove] == 1;
+            if (isRightBoundLimit || checkNextMovFromCenter || checkNextMovFromCenterUp || checkNextMovFromCenterDown){
+                return;
+            }
+
+            pacman.x += speed;
+            pacman.textures = pacmanTextures['right'];
+        } else if(currentDirection.horizontal == direction.left) {
+            let nextMov = currentHorizontalPos - ((spriteWidth / 2) / spriteWidth);
+            let nextMovUp = currentVerticalPos - ((spriteHeight / 3) / spriteHeight);
+            let nextMovDown = currentVerticalPos + ((spriteHeight / 3) / spriteHeight);
+            let roundedNextMove = Math.abs(Math.trunc(nextMov));
+            let roundedNextMoveUp = Math.abs(Math.trunc(nextMovUp));
+            let roundedNextMoveDown = Math.abs(Math.trunc(nextMovDown));
+
+            let isLeftBoundLimit = currentHorizontalPos <= 0;
+            let checkNextMovFromCenter = stage[roundedCurrentVerticalPos][roundedNextMove] == 1;
+            let checkNextMovFromCenterUp = stage[roundedNextMoveUp][roundedNextMove] == 1;
+            let checkNextMovFromCenterDown = stage[roundedNextMoveDown][roundedNextMove] == 1;
+            if (isLeftBoundLimit || checkNextMovFromCenter || checkNextMovFromCenterUp || checkNextMovFromCenterDown) {
+                return;
+            }
+            
+            pacman.x -= speed;
+            pacman.textures = pacmanTextures['left'];
+        } else if(currentDirection.vertical == direction.up) {
+            let nextMov = currentVerticalPos - ((spriteHeight / 2) / spriteHeight);
+            let nextMovLeft = currentHorizontalPos - ((spriteWidth / 3) / spriteWidth);
+            let nextMovRight = currentHorizontalPos + ((spriteWidth / 3) / spriteWidth);
+            let roundedNextMove = Math.abs(Math.trunc(nextMov));
+            let roundedNextMoveLeft = Math.abs(Math.trunc(nextMovLeft));
+            let roundedNextMoveRight = Math.abs(Math.trunc(nextMovRight));
+
+            let isUpBoundLimit = currentVerticalPos <= 0;
+            let checkNextMovFromCenter = stage[roundedNextMove][roundedCurrentHorizontalPos] == 1;
+            let checkNextMovFromCenterLeft = stage[roundedNextMove][roundedNextMoveLeft] == 1;
+            let checkNextMovFromCenterRight = stage[roundedNextMove][roundedNextMoveRight] == 1;
+            if (isUpBoundLimit || checkNextMovFromCenter || checkNextMovFromCenterLeft || checkNextMovFromCenterRight) {
+                return;
+            }
+
+            pacman.y -= speed;
+            pacman.textures = pacmanTextures['up'];
+        } else if(currentDirection.vertical == direction.down) {
+            let nextMov = currentVerticalPos + ((spriteHeight / 2) / spriteHeight);
+            let nextMovLeft = currentHorizontalPos + ((spriteWidth / 3) / spriteWidth);
+            let nextMovRight = currentHorizontalPos - ((spriteWidth / 3) / spriteWidth);
+            let roundedNextMove = Math.abs(Math.trunc(nextMov));
+            let roundedNextMoveLeft = Math.abs(Math.trunc(nextMovLeft));
+            let roundedNextMoveRight = Math.abs(Math.trunc(nextMovRight));
+
+            let isDownBoundLimit = roundedCurrentVerticalPos >= stage.length - 1;
+            let checkNextMovFromCenter = stage[roundedNextMove][roundedCurrentHorizontalPos] == 1;
+            let checkNextMovFromCenterLeft = stage[roundedNextMove][roundedNextMoveLeft] == 1;
+            let checkNextMovFromCenterRight = stage[roundedNextMove][roundedNextMoveRight] == 1;
+            
+            
+            if (isDownBoundLimit || checkNextMovFromCenter || checkNextMovFromCenterLeft || checkNextMovFromCenterRight) {
+                return;
+            }
+
+            pacman.y += speed;
+            pacman.textures = pacmanTextures['down'];
+        }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    function onKeyDown(key) {
+
+        if (key.code == "ArrowDown") {
+            currentDirection.vertical = direction.down;
+        }
+
+        if (key.code == "ArrowUp") {
+            currentDirection.vertical = direction.up;
+        }
+
+        if (key.code == "ArrowRight") {
+            currentDirection.horizontal = direction.right;
+        }
+
+        if (key.code == "ArrowLeft") {
+            currentDirection.horizontal = direction.left;
+        }
+    }
+
+    function onKeyUp(key) {
+        if (key.code == "ArrowLeft" || key.code == "ArrowRight") {
+            currentDirection.horizontal = direction.stand;
+        }
+
+        if (key.code == "ArrowUp" || key.code == "ArrowDown") {
+            currentDirection.vertical = direction.stand;
+        }
+        pacman.stop();
+    }
+
+    app.start();
+</script>
+</body>
+</html>
